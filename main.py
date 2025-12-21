@@ -34,14 +34,13 @@ if __name__ == "__main__":
         ast_output = attach_asts_to_results(out, trimRes["kept_crypto_files"])
         print("AST annotation complete:", ast_output)
 
-        # pruner_script = Path(__file__).resolve().parent / "frontend" / "pruneAst.js"
+        pruner_script = Path(__file__).resolve().parent / "frontend" / "pruneAst.js"
 
-        # pruned = subprocess.check_output(
-        #     ["node", str(pruner_script), ast_output["output_path"]],
-        #     text=True
-        # )
-
-        # print("Pruning complete:", pruned)
+        try:
+            pruned = subprocess.check_output(["node", str(pruner_script)], text=True)
+            print("Pruning complete:", pruned)
+        except subprocess.CalledProcessError as e:
+            print("Pruning failed:", e.stdout, e.stderr)
 
     except Exception as err:
         print("Error in main:", err)

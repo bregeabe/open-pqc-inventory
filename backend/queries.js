@@ -44,6 +44,12 @@ export function insertAST(fileId, astJsonString) {
   return id;
 }
 
+export function updateAST(astId, prunedAstJsonString) {
+  db.prepare(
+    `UPDATE fileAST SET ast = ? WHERE astId = ?`
+  ).run(prunedAstJsonString, astId);
+}
+
 export function deleteProject(projectId) {
   db.prepare(`DELETE FROM project WHERE projectId = ?`).run(projectId);
 }
