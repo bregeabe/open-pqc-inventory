@@ -1,6 +1,9 @@
 import os
 import re
 from pathlib import Path
+import json
+import subprocess
+
 
 KEEP_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx"}
 IGNORE_FOLDERS = {"node_modules", "dist"}
@@ -119,14 +122,19 @@ def trimmer(repo_path: str | Path) -> dict:
 
     Returns:
         {
-            "kept_crypto_files": [...],
+            "kept_crypto_files": { file_path: [categories...] },
             "removed_non_crypto_files": [...],
+            "matches_by_category": { category: [file_paths...] }
         }
     """
     repo_path = Path(repo_path).resolve()
 
-    kept = []
-    deleted = []
+    kept_by_file = {}          # file_path → [categories...]
+    removed_files = []         # simple list of deleted files
+    matches_by_category = {}   # category → [file_paths...]
+
+    for category in CRYPTO_PATTERNS.keys():
+        matches_by_category[category] = []
 
     compiled_patterns = []
     for category, patterns in CRYPTO_PATTERNS.items():
@@ -150,25 +158,91 @@ def trimmer(repo_path: str | Path) -> dict:
             except Exception:
                 continue
 
-            has_crypto_match = False
+            matched_categories = []
 
             for category, regex in compiled_patterns:
                 if regex.search(content):
-                    has_crypto_match = True
-                    break
+                    matched_categories.append(category)
 
-            if has_crypto_match:
-                kept.append(str(file_path))
+            if matched_categories:
+                kept_by_file[str(file_path)] = matched_categories
+
+                for category in matched_categories:
+                    matches_by_category[category].append(str(file_path))
+
             else:
+                # File removed — no crypto usage
                 try:
                     file_path.unlink()
-                    deleted.append(str(file_path))
+                    removed_files.append(str(file_path))
                 except Exception as e:
                     print(f"Warning: Failed to delete {file_path}: {e}")
 
     delete_empty_dirs(repo_path, IGNORE_FOLDERS)
 
     return {
-        "kept_crypto_files": kept,
-        "removed_non_crypto_files": deleted,
+        "kept_crypto_files": kept_by_file,
+        "removed_non_crypto_files": removed_files,
+        "matches_by_category": matches_by_category,
+    }
+
+def attach_asts_to_results(results_json_path: str | Path) -> dict:
+    """
+    Given a JSON file whose top-level structure is:
+        {
+            "aes": ["/path/file1.ts", ...],
+            "rsa": [...],
+            ...
+        }
+
+    This function:
+      - Finds all unique file paths across all categories,
+      - Runs astParser.js on each file to get an SWC AST,
+      - Adds an "asts" field mapping file_path -> AST result,
+      - Writes a new JSON file alongside the original:
+            <original_stem>_with_ast.json
+
+    Returns:
+        {
+            "output_path": <path to new json>,
+            "files_annotated": <count of files processed>
+        }
+    """
+    results_path = Path(results_json_path).resolve()
+    results = json.loads(results_path.read_text())
+
+    updated_results = dict(results)
+    updated_results["asts"] = {}
+
+    file_paths: set[str] = set()
+    for category, files in results.items():
+        if not isinstance(files, list):
+            continue
+        for fp in files:
+            file_paths.add(fp)
+
+    script = Path(__file__).resolve().parent / "jsParser.js"
+
+    for file_path in file_paths:
+        try:
+            output = subprocess.check_output(
+                ["node", str(script), file_path],
+                text=True
+            )
+            parsed = json.loads(output)
+            updated_results["asts"][file_path] = parsed
+
+        except Exception as e:
+            updated_results["asts"][file_path] = {
+                "ok": False,
+                "error": str(e),
+            }
+
+    new_path = results_path.with_name(results_path.stem + "_with_ast.json")
+    print(updated_results)
+    new_path.write_text(json.dumps(updated_results, indent=4))
+
+    return {
+        "output_path": str(new_path),
+        "files_annotated": len(file_paths),
     }
