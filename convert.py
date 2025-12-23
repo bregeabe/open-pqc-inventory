@@ -20,6 +20,7 @@ def extract_cbom_objects(data: list) -> list:
     results = []
 
     for entry in data:
+        entry = entry.get("cbom")
         output_text = entry.get("output", "").strip()
         if not output_text:
             continue

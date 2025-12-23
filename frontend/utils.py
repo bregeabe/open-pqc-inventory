@@ -9,7 +9,14 @@ import json
 import os
 import logging
 import time
+from dotenv import load_dotenv
+import os
+from backend.queries import clear_database
+from frontend.usageScanner import scan_and_filter_repo, trimmer, attach_asts_to_results
+from frontend.repoParser import clone_repo, remove_repo_path
+import subprocess
 
+load_dotenv()
 
 DEFAULT_MODEL = "gpt-4.1-mini"
 
@@ -20,6 +27,7 @@ SUPPORTED_MODELS = {
     "o3-mini": "chat.completions",
     "o3": "chat.completions",
 }
+TEMP_ROOT = Path(__file__).resolve().parent.parent / "results"
 
 def export_all_asts_to_json(project_id: str, output_path: str | Path) -> dict:
     """
@@ -140,6 +148,7 @@ def generate_cbom_from_ast(
     if len(ast_json_str) > MAX_CHARS:
         print("AST too large, slicing:", len(ast_json_str))
         ast_json_str = ast_json_str[:MAX_CHARS]
+        return {}
 
     prompt = BASE_PROMPT + ast_json_str
 
@@ -182,3 +191,121 @@ def read_json_file(file_path: str) -> Optional[Any]:
     except Exception as e:
         logging.error(f"Unexpected error reading JSON file {file_path}: {e}")
     return None
+
+def parse_github_repo(github_url: str, out_path: str ) -> tuple[Dict[Any, Any], str, Path]:
+        print("Clearing database...")
+        clear_database()
+        repo_path, project_id = clone_repo(github_url)
+        print("Repo cloned at:", repo_path)
+        result = scan_and_filter_repo(repo_path)
+        print("Kept files after initial scan:", len(result["kept"]))
+        print("Deleted files after initial scan:", len(result["deleted"]))
+
+        trimRes = trimmer(repo_path, project_id)
+        print("Kept files after trimming:", len(trimRes["kept_crypto_files"]))
+        print("Deleted files after trimming:", len(trimRes["removed_non_crypto_files"]))
+        print("Matches by category", trimRes["matches_by_category"])
+
+        with open(out_path, "w") as f:
+            json.dump(trimRes["matches_by_category"], f, indent=4)
+
+        ast_output = attach_asts_to_results(out_path, trimRes["kept_crypto_files"])
+        return (ast_output, project_id, repo_path)
+
+def prune_ast( project_id: str) -> Path:
+        pruner_script = Path(__file__).resolve().parent.parent / "frontend" / "pruneAst.js"
+
+        try:
+            pruned = subprocess.check_output(["node", str(pruner_script)], text=True)
+            print("Pruning complete:", pruned)
+        except subprocess.CalledProcessError as e:
+            print("Pruning failed:", e.stdout, e.stderr)
+
+        export_all_asts_to_json(project_id, f"{TEMP_ROOT}/pruned_project_asts.json")
+        return TEMP_ROOT / "pruned_project_asts.json"
+
+def collect_unique_files(matches: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    """
+    Returns a mapping:
+      file_path -> [categories...]
+    """
+    file_map: Dict[str, List[str]] = {}
+
+    for category, files in matches.items():
+        for f in files:
+            file_map.setdefault(f, []).append(category)
+
+    return file_map
+
+
+def read_source_file(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except Exception as e:
+        logging.warning(f"Failed to read {path}: {e}")
+        return None
+
+
+def generate_cboms_from_matches(MATCHES_FILE: Path = TEMP_ROOT / "matches.json", OUTPUT_FILE: Path = TEMP_ROOT / "cbom_output.json"):
+    matches = read_json_file(str(MATCHES_FILE))
+    if not matches:
+        raise ValueError("matches.json is missing or empty")
+
+    file_map = collect_unique_files(matches)
+
+    logging.info(f"Total unique files to process: {len(file_map)}")
+
+    results: List[Dict[str, Any]] = []
+
+    for idx, (file_path, categories) in enumerate(file_map.items(), start=1):
+        path = Path(file_path)
+
+        logging.info(f"[{idx}/{len(file_map)}] Processing {path}")
+
+        source = read_source_file(path)
+        if not source:
+            continue
+
+        try:
+            cbom = generate_cbom_from_ast(
+                ast_json_str=source,
+                model="gpt-4.1",
+            )
+        except Exception as e:
+            logging.error(f"CBOM generation failed for {path}: {e}")
+            continue
+
+        results.append({
+            "file_path": str(path),
+            "categories": categories,
+            "cbom": cbom,
+        })
+
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_FILE.write_text(json.dumps(results, indent=2), encoding="utf-8")
+
+    logging.info(f"CBOM generation complete → {OUTPUT_FILE}")
+
+def generate_cboms_from_ast_files(out_ast_path: Path = TEMP_ROOT / "pruned_project_asts.json"):
+    print ("Generating CBOMs...")
+    fileJson = read_json_file(str(out_ast_path))
+    if fileJson is None:
+        raise ValueError("Failed to read pruned AST JSON file.")
+
+    astJsonList = fileJson["files"]
+    flat = ["".join(sub) for sub in astJsonList]
+    res = []
+    for item in flat:
+        if not isinstance(item, str):
+            print("Skipping non-string AST item:", item)
+            continue
+        if isinstance(item, str):
+            cbom = generate_cbom_from_ast(
+                ast_json_str=item,
+                model="gpt-4.1"
+            )
+            print("Generated CBOM:", cbom)
+            res.append(cbom)
+    print("CBOM generation complete:", res)
+    with open(f"{TEMP_ROOT}/cbom_output.json", "w") as f:
+        json.dump(res, f, indent=4)
