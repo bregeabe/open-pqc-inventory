@@ -146,3 +146,6 @@ Detection in open source JavaScript project [hybrid-crypto-js](https://github.co
 [Cryptoscope](https://research.ibm.com/publications/cryptoscope-analyzing-cryptographic-usages-in-modern-software)
 
 [On Criteria and Tooling for Cryptographic Inventories](https://www.researchgate.net/publication/381728957_On_Criteria_and_Tooling_for_Cryptographic_Inventories)
+
+## Data
+[Encrypted Web Traffic Dataset: Event Logs and Packet Traces](https://www.scidb.cn/en/detail?dataSetId=ec72229d46624e4e8b8528dd0485f5b4)
