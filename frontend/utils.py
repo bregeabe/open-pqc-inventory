@@ -12,8 +12,8 @@ import time
 from dotenv import load_dotenv
 import os
 from backend.queries import clear_database
-from frontend.usageScanner import scan_and_filter_repo, trimmer, attach_asts_to_results, resolve_imports_for_repo
-from frontend.repoParser import clone_repo, remove_repo_path
+from backend.analyzers.repoAnalyzer import scan_and_filter_repo, trimmer, attach_asts_to_results, resolve_imports_for_repo
+from backend.analyzers.repoAnalyzer import clone_repo, remove_repo_path
 import subprocess
 import re
 

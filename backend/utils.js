@@ -1,3 +1,5 @@
+import * as swc from "@swc/core";
+import * as fs from "fs";
 import { db } from "../db/client.js";
 
 const CRYPTO_PATTERNS = {
@@ -13,6 +15,32 @@ const ALL_PATTERNS = new RegExp(
   Object.values(CRYPTO_PATTERNS).flat().join("|"),
   "i"
 );
+
+async function parseFileToAst(path) {
+  const code = fs.readFileSync(path, "utf-8");
+
+  try {
+    const ast = await swc.parse(code, {
+      syntax: "typescript",
+      tsx: path.endsWith(".tsx"),
+      jsx: path.endsWith(".jsx"),
+      decorators: true,
+      comments: true,
+      target: "es2022",
+    });
+
+    return { ok: true, ast };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+(async () => {
+  const file = process.argv[2];
+  const result = await parseFileToAst(file);
+  console.log(JSON.stringify(result));
+})();
+
 
 function pruneAstNode(node) {
   if (!node || typeof node !== "object") return null;
@@ -49,7 +77,7 @@ function pruneAstNode(node) {
   return isMatch ? cloned : null;
 }
 
-function main() {
+function pruneAstFromSQLite() {
   console.log("Loading AST records from SQLite...");
 
   const rows = db.prepare(`
@@ -88,5 +116,3 @@ function main() {
   console.log(`Updated ASTs: ${updated}`);
   console.log(`Skipped ASTs: ${skipped}`);
 }
-
-main();

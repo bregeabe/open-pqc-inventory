@@ -1,9 +1,14 @@
 import os
-import re
-from pathlib import Path
-import json
+import shutil
 import subprocess
-from backend.queries import insert_file, insert_ast
+import uuid
+from pathlib import Path
+from backend.queries import insert_project, insert_file, insert_ast
+import re
+import json
+
+TEMP_ROOT = Path(__file__).resolve().parent / "tmp"
+TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 KEEP_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx"}
 IGNORE_FOLDERS = {"node_modules", "dist"}
@@ -54,6 +59,73 @@ CRYPTO_PATTERNS = {
         r"token",
     ]
 }
+
+class RepoCloneError(Exception):
+    """Custom error type for repo clone failures."""
+    pass
+
+
+def _validate_git_url(url: str):
+    """
+    Basic validation for URLs that support git clone.
+    HTTPS recommended. SSH optional.
+    """
+    if not isinstance(url, str):
+        raise ValueError("Repo URL must be a string")
+
+    if url.startswith("http://") or url.startswith("https://") or url.startswith("git@"):
+        return url
+
+    raise ValueError(f"Unsupported repo URL format: {url}")
+
+
+def _build_temp_path(project_id: str):
+    """
+    Returns a unique new directory path under TEMP_ROOT.
+    """
+    path = TEMP_ROOT / project_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def clone_repo(repo_url: str) -> tuple[Path, str]:
+    """
+    Clones a public repository into a fresh UUID temp dir and returns its path.
+
+    Parameters:
+        repo_url (str): URL for cloning (https://..., http://..., or git@...)
+
+    Returns:
+        Path: location of the cloned repo
+    """
+    repo_url = _validate_git_url(repo_url)
+    project_id = insert_project(repo_url)
+    working_dir = _build_temp_path(project_id)
+    repo_path = working_dir / "repo"
+
+    try:
+        result = subprocess.run(
+            ["git", "clone", "--depth", "1", repo_url, str(repo_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=60,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            shutil.rmtree(working_dir, ignore_errors=True)
+            raise RepoCloneError(f"Git clone failed: {result.stderr}")
+
+        return (repo_path, project_id)
+
+    except Exception as e:
+        shutil.rmtree(working_dir, ignore_errors=True)
+        raise RepoCloneError(str(e))
+
+
+def remove_repo_path(path: Path):
+    if path.exists():
+        shutil.rmtree(path, ignore_errors=True)
 
 def scan_and_filter_repo(repo_path: str | Path) -> dict:
     """

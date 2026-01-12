@@ -214,3 +214,4 @@ results/
 foo.*
 blog.md
 *.bkp
+ssh_known_hosts_inventory.json
