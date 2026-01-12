@@ -1,10 +1,8 @@
 # open-pqc-inventory
 
-Modeled After [Cryptoscope](https://research.ibm.com/publications/cryptoscope-analyzing-cryptographic-usages-in-modern-software)
-
 ## Results
-Detection in open source JavaScript projects:
-### https://github.com/juhoen/hybrid-crypto-js
+Detection in open source JavaScript project [hybrid-crypto-js](https://github.com/juhoen/hybrid-crypto-js)
+
 ```json
 [
     {
@@ -143,3 +141,8 @@ Detection in open source JavaScript projects:
 - Error handling
 - Expand regex's
 - Start support for specific libraries
+
+## Normative References
+[Cryptoscope](https://research.ibm.com/publications/cryptoscope-analyzing-cryptographic-usages-in-modern-software)
+
+[On Criteria and Tooling for Cryptographic Inventories](https://www.researchgate.net/publication/381728957_On_Criteria_and_Tooling_for_Cryptographic_Inventories)
