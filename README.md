@@ -8,9 +8,6 @@
 ## Data
 [Encrypted Web Traffic Dataset: Event Logs and Packet Traces](https://www.scidb.cn/en/detail?dataSetId=ec72229d46624e4e8b8528dd0485f5b4)
 
-## Diagram
-![Relational Diagram](assets/pqc-inventory.png)
-
 ## Results
 
 ### Detection in open source JavaScript project [hybrid-crypto-js](https://github.com/juhoen/hybrid-crypto-js)
@@ -176,7 +173,7 @@ CIPHER SUITE BREAKDOWN:
 0x00FF: UNKNOWN_00FF                                    Count:      3 (0.3%)
 ```
 Partial output:
-```
+```json
 [
   {
     "packet_number": 28,
@@ -290,7 +287,6 @@ Partial output:
       "cipher_suite_id_numeric": 4866
     }
   },
-  ...
 ]
 ```
 
