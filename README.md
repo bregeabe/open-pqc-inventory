@@ -329,3 +329,53 @@ Found 1 keys used across multiple hosts
    Key (ssh-ed25519): 2 hosts
 
 ```
+
+### Package Analyzer
+
+```
+================================================================================
+SOURCE CODE CRYPTOGRAPHIC LIBRARY ANALYSIS
+================================================================================
+Files scanned: 648,594
+Files with crypto usage: 6,062
+Programming languages detected: 5
+Unique crypto libraries found: 112
+
+ANALYSIS BY PROGRAMMING LANGUAGE:
+---------------------------------------------
+PYTHON          Files: 34912 | Crypto: 4800 | Libraries: 99
+C_CPP           Files: 14151 | Crypto: 184 | Libraries:  5
+JAVA            Files:   64 | Crypto:  52 | Libraries:  3
+JAVASCRIPT      Files: 2313 | Crypto: 932 | Libraries:  9
+RUST            Files:    2 | Crypto:   0 | Libraries:  0
+SWIFT           Files:    3 | Crypto:   0 | Libraries:  0
+RUBY            Files: 2738 | Crypto:  88 | Libraries:  3
+GO              Files:    1 | Crypto:   0 | Libraries:  0
+
+CRYPTOGRAPHIC LIBRARIES DETECTED:
+----------------------------------------
+                            (6434 occurrences)
+  re                        (3155 occurrences)
+  cryptography              (1874 occurrences)
+  ssl                       (494 occurrences)
+  hashlib                   (318 occurrences)
+  paramiko                  (238 occurrences)
+  openssl                   (210 occurrences)
+  org                       (206 occurrences)
+  a                         (198 occurrences)
+  java                      (178 occurrences)
+  dom                       (104 occurrences)
+  lib                       (99 occurrences)
+  sodium                    (98 occurrences)
+  to                        (96 occurrences)
+  node-forge                (80 occurrences)
+
+SECURITY ANALYSIS:
+--------------------
+High risk files: 3
+Post-quantum ready: 31.1% (4606/14792)
+
+Results exported to: crypto_source_packages.json
+
+10186 cryptographic dependencies are not post-quantum ready
+```
